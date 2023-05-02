@@ -1,0 +1,158 @@
+<form class="" id="chat_form">
+
+    <div id="chat_list" class="mb-3 border" style="min-height: 170px ; max-height: 210px; overflow:scroll ">
+
+        <p class="text-sm-start">
+            <span class="badge rounded-pill text-bg-light">自己：</span>
+            发送的信息
+        </p>
+        <p class="text-sm-start">
+            <span class="badge rounded-pill text-bg-secondary   ">自己：</span>
+            发送的信息
+        </p>
+
+    </div>
+
+    <div class="row">
+        <div class="col-auto">
+            <input type="text" class="form-control" id="input_message" aria-label="输入聊天内容"/>
+        </div>
+        <div class="col">
+            <button class="btn btn-primary mb-3" onclick="sendChatMessage();" type="button"> 发送</button>
+        </div>
+    </div>
+
+</form>
+
+<script id="tpl_snd_msg" type="text/html">
+    <p class="text-sm-start">
+        <span class="badge rounded-pill text-bg-secondary">自己：</span>
+        <span class="my-msg">
+                    {{msg}}
+                    </span>
+    </p>
+</script>
+
+<script id="tpl_rcv_msg" type="text/html">
+    <p class="text-sm-end">
+        <span class="badge rounded-pill text-bg-info">from：{from}</span>
+        <span class="others-msg">
+                    {{msg}}
+                    </span>
+    </p>
+</script>
+<script>
+
+    var url = "ws://127.0.0.1:9502"
+
+    var socket = new WebSocket(url);
+    var chatList = new ChatList('#chat_list');
+
+    socket.onopen = function () {
+        chatList.appendRawMessage('<p>连接成功</p>');
+    }
+
+    socket.onmessage = function (msg) {
+        // console.log(msg) ;
+        // JSON.parse 需要处理濹
+        // chatList.appendMessage(msg.msg);
+        var data = JSON.parse(msg.data);
+
+        var userId = data['userId'];
+        // console.log(data.msg);
+        // alert("有消息啦");
+        // 啥情况 连续两次 解码！！！👎
+        var m = JSON.parse(data.msg);
+        // chatList.appendRawMessage(m.msg);
+        // console.log(typeof data.msg);
+
+        chatList.appendOthersMessage(m.msg,userId);
+    }
+
+    socket.onclose = function () {
+        // log1('断开连接')
+        chatList.appendRawMessage('断开链接啦！　');
+    }
+
+    function ChatList(selector) {
+        this.element = $(selector);
+    }
+
+    ChatList.prototype.appendRawMessage = function (msg) {
+        // var msgWrapper = $()
+        // this.element.append($("p").addClass('text-sm-start').append(
+        //    $('span').addClass('badge rounded-pill text-bg-info').html( msg)
+        // ));
+        // this.element.append('<p>'+msg+'</p>');
+        this.element.append(msg);
+        this.element.scrollTop(this.element[0].scrollHeight);
+    }
+    ChatList.prototype.appendOwnMessage = function (msg) {
+        // TODO 可以搞成ChatList私有成员
+        var $tpl_snd_msg = $('#tpl_snd_msg');
+        // var $tpl = $tpl_snd_msg.clone(); // 模版克隆
+        // var $msgContainer =   $tpl;
+        var msgContainer = $tpl_snd_msg.clone();
+        ;
+        var $msgContainer = $(msgContainer.html());
+        $msgContainer.find('.my-msg').text(msg);
+        // var $msgSpan = $msgContainer.find('span') ;
+        // alert($msgSpan.length);
+        this.appendRawMessage($msgContainer);
+
+    }
+    ChatList.prototype.appendOthersMessage = function (msg, userId) {
+        // TODO 可以搞成ChatList私有成员
+        var $tpl_rcv_msg = $('#tpl_rcv_msg');
+
+        var msgContainer = $tpl_rcv_msg.clone();
+        // 这里好奇怪呀 要再包装一次
+        var $msgContainer = $(msgContainer.html());
+        var $othersMsg = $msgContainer.find('.others-msg').text(msg);
+
+        if (userId) {
+            $othersMsg.prev().text("from: " + userId);
+        }
+        // var $msgSpan = $msgContainer.find('span') ;
+        // alert($msgSpan.length);
+        this.appendRawMessage($msgContainer);
+
+    }
+
+    function sendChatMessage() {
+        var $input = $("#input_message");
+        var msg = $input.val();
+
+        // 也可以用jquery $.toJSON(str), $.evalJSON(str), php端： json_decode(), json_encode()
+        // 注意旧版浏览器 可以自己引入：https://github.com/douglascrockford/JSON-js
+
+        // 到底发送什么数据格式比较自由 但最好选择易于理解 且比较方便的 可以参考下知名框架都怎么做的
+        // vue react 等 格式{action:user_create , payload: {} }  或者如jsonrpc 风格也比较不错
+
+        var json = JSON.stringify({
+            "type": "php",
+            "msg": msg
+        });
+        // console.log(json) ;
+        socket.send(json);
+        chatList.appendOwnMessage(msg);
+
+
+        $input.val('');
+        // $input.closest('form').preventDefault() ;
+    }
+
+    // var form = document.getElementsByTagName('form')[0] // 本页面有多个form哦 最好用id获取吧！
+    var form = document.getElementById('chat_form');
+    // console.log(form);
+    // 或者通过id也可以 ； 在表单上通过 onsubmit = "return false; " 会阻止空格后者会车提交！
+    form.addEventListener('submit', function (e) {
+        // alert('submit');
+        e.preventDefault();
+
+        sendChatMessage();
+    })
+
+</script>
+
+
